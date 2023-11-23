@@ -6,7 +6,7 @@ import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
-from dataset.food_dataset import FoodImageFolder
+from dataset.food_dataset import ImageFolder
 
 
 class Main:
@@ -35,15 +35,8 @@ class Main:
         self.init_xlsx()
 
         self.data_transform = {
-            "train": transforms.Compose([transforms.Resize(256),
-                                         transforms.RandomCrop(224),
-                                         transforms.RandomHorizontalFlip(),
-                                         transforms.ToTensor(),
-                                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
-            "val": transforms.Compose([transforms.Resize(256),
-                                       transforms.CenterCrop(224),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])}
+            "train": transforms.Compose([transforms.ToTensor()]),
+            "val": transforms.Compose([transforms.ToTensor()])}
         self.load_food_dataset()
 
     def init_fold(self):
@@ -68,25 +61,23 @@ class Main:
         self.sheet1.write(0, 6, 'Best val Acc')
 
     def load_food_dataset(self):
-        train_dataset = FoodImageFolder(self.train_path, transform=self.data_transform["train"])
-        val_dataset = FoodImageFolder(self.valid_path, transform=self.data_transform["val"])
+        train_dataset = ImageFolder(self.train_path, transform=self.data_transform["train"])
+        val_dataset = ImageFolder(self.valid_path, transform=self.data_transform["val"])
         self.train_loader = torch.utils.data.DataLoader(train_dataset,
                                                         batch_size=self.batch_size,
                                                         shuffle=True,
                                                         pin_memory=True,
-                                                        num_workers=0,
-                                                        collate_fn=train_dataset.collate_fn)
+                                                        num_workers=0)
 
         self.val_loader = torch.utils.data.DataLoader(val_dataset,
                                                       batch_size=self.batch_size,
                                                       shuffle=False,
                                                       pin_memory=True,
-                                                      num_workers=0,
-                                                      collate_fn=val_dataset.collate_fn)
+                                                      num_workers=0)
 
     def train_one_epoch(self, model, optimizer, data_loader, epoch):
         model.train()
-        loss_function = torch.nn.CrossEntropyLoss()
+        loss_function = torch.nn.CrossEntropyLoss().to(self.device)
         accu_loss = torch.zeros(1).to(self.device)  # 累计损失
         accu_num = torch.zeros(1).to(self.device)  # 累计预测正确的样本数
         optimizer.zero_grad()
@@ -94,14 +85,15 @@ class Main:
         sample_num = 0
         data_loader = tqdm(data_loader, file=sys.stdout)
         for step, data in enumerate(data_loader):
-            images, labels = data
+            images = data[0].to(self.device)
+            labels = data[1].to(self.device)
             sample_num += images.shape[0]
 
-            pred = model(images.to(self.device))
+            pred = model(images)
             pred_classes = torch.max(pred, dim=1)[1]
-            accu_num += torch.eq(pred_classes, labels.to(self.device)).sum()
+            accu_num += torch.eq(pred_classes, labels).sum()
 
-            loss = loss_function(pred, labels.to(self.device))
+            loss = loss_function(pred, labels)
             loss.backward()
             accu_loss += loss.detach()
 
@@ -120,7 +112,7 @@ class Main:
 
     @torch.no_grad()
     def evaluate(self, model, data_loader, epoch):
-        loss_function = torch.nn.CrossEntropyLoss()
+        loss_function = torch.nn.CrossEntropyLoss().to(self.device)
 
         model.eval()
 
@@ -130,14 +122,15 @@ class Main:
         sample_num = 0
         data_loader = tqdm(data_loader, file=sys.stdout)
         for step, data in enumerate(data_loader):
-            images, labels = data
+            images = data[0].to(self.device)
+            labels = data[1].to(self.device)
             sample_num += images.shape[0]
 
-            pred = model(images.to(self.device))
+            pred = model(images)
             pred_classes = torch.max(pred, dim=1)[1]
-            accu_num += torch.eq(pred_classes, labels.to(self.device)).sum()
+            accu_num += torch.eq(pred_classes, labels).sum()
 
-            loss = loss_function(pred, labels.to(self.device))
+            loss = loss_function(pred, labels)
             accu_loss += loss
 
             data_loader.desc = "[valid epoch {}] loss: {:.3f}, acc: {:.3f}".format(epoch,

@@ -1,7 +1,9 @@
 import torch
 from torch import nn
 import torchvision
+from torchvision import transforms
 from utils.utils import Main
+
 
 class VGG19_BN(nn.Module):
     def __init__(self, num_cls=10, dropout_rate=0.5):
@@ -13,6 +15,9 @@ class VGG19_BN(nn.Module):
         model_vgg19_bn = torchvision.models.vgg19_bn(weights=torchvision.models.VGG19_BN_Weights.IMAGENET1K_V1)
         # 分类数
         self.num_cls = num_cls
+        self.transforms = torch.nn.Sequential(
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        )
         # 获取VGG19-BN的卷积层和全连接层
         self.features = model_vgg19_bn.features
         self.avgpool = model_vgg19_bn.avgpool
@@ -33,6 +38,7 @@ class VGG19_BN(nn.Module):
             param.requires_grad = True
 
     def forward(self, x):
+        x = self.transforms(x)
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
@@ -45,12 +51,12 @@ if __name__ == '__main__':
     vgg_cnn = VGG19_BN(208)
     main_train = Main(device='cuda:0',
                       num_classes=208,
-                      train_path=r"D:\DataSets\Chinese_Food\release_data\train",
-                      valid_path=r"D:\DataSets\Chinese_Food\release_data\val",
-                      batch_size=128,
+                      train_path=r"D:\DataSets\Chinese_Food\aglin_release_data\train",
+                      valid_path=r"D:\DataSets\Chinese_Food\aglin_release_data\val",
+                      batch_size=126,
                       lr=0.01,
                       epochs=90,
-                      weight_path=r"../weights/best_model_208_vgg19.pth",
-                      log_file_path=r'../logs/Train_data_208_vgg19.xlsx',
-                      tensorbord_path=r'../logs/runs/208_vgg19')
+                      weight_path=r"../weights/best_model_208_vgg191.pth",
+                      log_file_path=r'../logs/Train_data_208_vgg191.xlsx',
+                      tensorbord_path=r'../logs/runs/208_vgg191')
     main_train.train(vgg_cnn)
