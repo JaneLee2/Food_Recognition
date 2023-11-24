@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import torchvision
 from utils.utils import Main
+from torchvision import transforms
 
 
 class ResNet50(nn.Module):
@@ -10,6 +11,7 @@ class ResNet50(nn.Module):
 
         # 加载预训练的resnet模型
         # https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html
+        # https://pytorch.org/vision/main/_modules/torchvision/models/resnet.html#ResNet50_Weights
         model_resnet = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2)
         # 分类数
         self.num_cls = num_cls
@@ -24,6 +26,9 @@ class ResNet50(nn.Module):
         self.layer4 = model_resnet.layer4
         self.avgpool = model_resnet.avgpool
         self.fc = model_resnet.fc
+        self.transforms = torch.nn.Sequential(
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        )
 
         # 在全连接层之前添加Dropout层
         self.dropout = nn.Dropout(p=dropout_rate)
@@ -40,6 +45,7 @@ class ResNet50(nn.Module):
             param.requires_grad = True
 
     def forward(self, x):
+        x = self.transforms(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -61,12 +67,12 @@ if __name__ == '__main__':
     resnet_cnn = ResNet50(10)
     main_train = Main(device='cuda:0',
                       num_classes=10,
-                      train_path=r"D:\DataSets\Chinese_Food\Chinesefood-10\train",
-                      valid_path=r"D:\DataSets\Chinese_Food\Chinesefood-10\val",
+                      train_path=r"D:\DataSets\Chinese_Food\aglin_Chinesefood-10\train",
+                      valid_path=r"D:\DataSets\Chinese_Food\aglin_Chinesefood-10\val",
                       batch_size=128,
                       lr=0.01,
                       epochs=90,
-                      weight_path=r"../weights/best_model_resnet50.pth",
-                      log_file_path=r'../logs/Train_data_resnet50.xlsx',
-                      tensorbord_path=r'../logs/runs/resnet50')
+                      weight_path=r"../weights/best_model_resnet50_no_aug.pth",
+                      log_file_path=r'../logs/Train_data_resnet50_no_aug.xlsx',
+                      tensorbord_path=r'../logs/runs/resnet50_no_aug')
     main_train.train(resnet_cnn)
